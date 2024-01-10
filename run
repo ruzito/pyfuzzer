@@ -1,0 +1,66 @@
+#!/bin/bash
+
+# Define an array of pairs (command_name, executable_path)
+commands=(
+    "coverage,./scripts/coverage.sh"
+    "explain,./scripts/explain.sh"
+    "mutations,./scripts/mutations.sh"
+    "run,./scripts/run.sh"
+    "setup,./scripts/setup.sh"
+    "test,./scripts/test.sh"
+)
+
+# Function to find commands that start with the given prefix
+find_commands() {
+    local prefix="$1"
+    local found=()
+
+    for cmd_pair in "${commands[@]}"; do
+        IFS=',' read -r name path <<< "$cmd_pair"
+        if [[ $name == "$prefix"* ]]; then
+            found+=("$cmd_pair")
+        fi
+    done
+
+    echo "${found[@]}"
+}
+
+# Main script logic
+if [ $# -lt 1 ]; then
+    echo "Usage: $0 <command> [args...]"
+    echo "Possible commands are:"
+        for cmd_pair in "${commands[@]}"; do
+            IFS=',' read -r name path <<< "$cmd_pair"
+            echo "  - $name"
+        done
+        exit 2
+fi
+
+# Lookup commands
+prefix="$1"
+found_commands=( $(find_commands "$prefix") )
+
+# Check the number of commands found
+case "${#found_commands[@]}" in
+    0)
+        echo "No commands found. Possible commands are:"
+        for cmd_pair in "${commands[@]}"; do
+            IFS=',' read -r name path <<< "$cmd_pair"
+            echo "  - $name"
+        done
+        exit 2
+        ;;
+    1)
+        IFS=',' read -r _ path <<< "${found_commands[0]}"
+        shift # Remove the first argument
+        exec "$path" "$@"
+        ;;
+    *)
+        echo "Ambiguous command error. Possible suggestions:"
+        for cmd_pair in "${found_commands[@]}"; do
+            IFS=',' read -r name _ <<< "$cmd_pair"
+            echo "  - $name"
+        done
+        exit 2
+        ;;
+esac
