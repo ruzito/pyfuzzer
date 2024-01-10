@@ -1,0 +1,8 @@
+/.mutmut-cache
+/.coverage
+/.hypothesis
+/coverage.json
+/coverage.xml
+/htmlcov
+__pycache__
+/.pytest_cache
