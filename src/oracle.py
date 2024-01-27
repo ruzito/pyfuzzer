@@ -2,10 +2,15 @@ import re
 
 from abc import ABC, abstractmethod
 
+from snapshot import OutputSnapshot
+
 class Oracle(ABC):
     @abstractmethod
-    def categorize(self, exit_code:int, stdout:bytes, stderr:bytes, timeout_flag:bool)->bytes:
+    def categorize(
+        self, output: OutputSnapshot
+    ) -> bytes:
         pass
+
 
 def analyze_output(process):
     asan_error = re.search(r"ERROR: AddressSanitizer", process.stderr)

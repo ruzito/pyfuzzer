@@ -2,15 +2,15 @@
 
 # Define an array of pairs (command_name, executable_path)
 commands=(
-    "coverage,./scripts/coverage.sh"
+    "coverages,./scripts/coverage.sh"
     "explain,./scripts/explain.sh"
-    "lint,./scripts/lint.sh"
+    "lints,./scripts/lint.sh"
     "mutations,./scripts/mutations.sh"
     "poetry,./scripts/poetry.sh"
-    "property_test,./scripts/property_test.sh"
+    "property_tests,./scripts/property_test.sh"
     "run,./scripts/run.sh"
     "setup,./scripts/setup.sh"
-    "test,./scripts/test.sh"
+    "tests,./scripts/test.sh"
 )
 
 # Function to find commands that start with the given prefix

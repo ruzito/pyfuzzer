@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -e
 
 export PYTHONPATH=`pwd`/src:`pwd`/tests
 ./.poetry/bin/poetry run black --exclude '.*/\.poetry/.*' .

@@ -2,12 +2,13 @@ from copy import deepcopy
 
 from abc import ABC, abstractmethod
 from typing import Tuple
+from snapshot import InputSnapshot
 
 class MinimizerRunner(ABC):
     # Should return true if the minimizer should assume the run was a hit
     # Should return false otherwise
     @abstractmethod
-    async def run(self, input:bytes) -> bool:
+    async def run(self, input: InputSnapshot) -> bool:
         pass
 
 
@@ -27,16 +28,37 @@ class Minimizer(ABC):
     #
     # @returns (minimized_payload, number_of_granularity_levels)
     @abstractmethod
-    def minimize(self, payload: bytes, granularity_level:int, segment_index:int, complement:bool)->Tuple[bytes,int,int]:
+    def minimize(
+        self,
+        payload: InputSnapshot,
+        granularity_level: int,
+        segment_index: int,
+        complement: bool,
+    ) -> Tuple[InputSnapshot, int, int]:
         pass
 
 
 class BinaryMinimizer(Minimizer):
-    def minimize(self, payload: bytes, granularity_level:int, segment_index:int, complement:bool)->Tuple[bytes,int,int]:
+    def minimize(
+        self,
+        input: InputSnapshot,
+        granularity_level: int,
+        segment_index: int,
+        complement: bool,
+    ) -> Tuple[InputSnapshot, int, int]:
+        def create_snapshot(stdin:bytes)->InputSnapshot:
+            return InputSnapshot(
+                stdin=stdin,
+                args=input.args,
+                timeout=input.timeout,
+                env=input.env,
+                artifact_paths=input.artifact_paths
+            )
+        payload = input.stdin
         length = len(payload)
         number_of_granularity_levels = length + 1
         if granularity_level == 0 and segment_index == 0:
-            return (bytes([]), number_of_granularity_levels, 1)
+            return (create_snapshot(b''), number_of_granularity_levels, 1)
 
         granularity = min(granularity_level, number_of_granularity_levels - 1)
         number_of_segments = granularity + 1
@@ -56,16 +78,17 @@ class BinaryMinimizer(Minimizer):
 
         if complement:
             res = (
-                before_slice + after_slice,
+                create_snapshot(before_slice + after_slice),
                 number_of_granularity_levels,
                 number_of_segments,
             )
         else:
-            res = (segment_slice, number_of_granularity_levels, number_of_segments)
+            res = (create_snapshot(segment_slice), number_of_granularity_levels, number_of_segments)
 
         return res
 
-async def minimizer_loop(input, runner: MinimizerRunner, minimizer: Minimizer):
+
+async def minimizer_loop(input: InputSnapshot, runner: MinimizerRunner, minimizer: Minimizer):
     # copy base payload
     base_payload = deepcopy(input)
 

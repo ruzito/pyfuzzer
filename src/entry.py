@@ -1,35 +1,26 @@
 from minimizer import BinaryMinimizer, MinimizerRunner, Minimizer
 from jobqueue import JobQueueManager, AsyncJob
-from runner import Runner
+from runner import runexec
 from oracle import Oracle
-
+from snapshot import InputSnapshot, OutputSnapshot
 
 class RandomInputJob(AsyncJob):
-    def __init__(self, queue:JobQueueManager, oracle: Oracle, runner: Runner, input, args: dict):
-        self.runner = runner
+    def __init__(self, queue:JobQueueManager, oracle: Oracle, input: InputSnapshot, args: dict):
         self.input = input
         self.args = args
         self.queue = queue
         self.oracle = oracle
 
     async def run(self):
-        result = await self.runner.bash_run(self.input, self.args)
-        (ret, stdout, stderr, timeout_flag) = result
-        if ret is None:
-            ret = 666
-        if isinstance(stdout, str):
-            stdout = stdout.encode('utf-8')
-        if isinstance(stderr, str):
-            stderr = stderr.encode('utf-8')
-        hash:bytes = self.oracle.categorize(ret, stdout, stderr, timeout_flag)
+        result:OutputSnapshot = await runexec(self.input)
+        hash:bytes = self.oracle.categorize(result)
 
 class MinimizeInputJob(AsyncJob):
-    def __init__(self, runner: Runner, minimizer: Minimizer, snapshot):
-        self.runner = runner
+    def __init__(self, input: InputSnapshot, minimizer: Minimizer, minimizer_runner):
         self.input = input
 
     async def run(self):
-        result = await self.runner.bash_run(self.input, self.args)
+        result = await runexec(self.input)
 
 
 class Application:
@@ -37,7 +28,6 @@ class Application:
         self.workers = 5
         self.queue = JobQueueManager(self.workers)
         self.queue.start()
-        self.runner = Runner("sleep 4")
 
     async def generate_stage(self):
         # Get random input
@@ -45,6 +35,7 @@ class Application:
         # Oracle result
         # Cache category
         # Potentially schedule category
+        pass
 
     async def minimize_stage(self):
         # TODO: await self.queue.join()

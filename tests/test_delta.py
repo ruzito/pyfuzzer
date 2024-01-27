@@ -2,37 +2,41 @@ import pytest
 import re
 
 from minimizer import BinaryMinimizer, minimizer_loop, MinimizerRunner
+from snapshot import InputSnapshot
 
 class RegexOracle(MinimizerRunner):
     def __init__(self, regex):
         self.regex = regex
 
     async def run(self, input):
-        if len(input) <= 0:
+        if len(input.stdin) <= 0:
             return False
-        return re.match(self.regex, input)
+        return re.match(self.regex, input.stdin.decode('utf-8'))
+
 
 @pytest.mark.parametrize(
-    "granularity, segment, complement, result",
+    "granularity, segment, complement, expected",
     [
-        (1, 1, True, (b"Hello", 12, 2)),
-        (1, 0, True, (b" world", 12, 2)),
-        (1, 0, False, (b"Hello", 12, 2)),
-        (1, 1, False, (b" world", 12, 2)),
-        (0, 0, True, (b'', 12, 1)),
-        (0, 0, False, (b'', 12, 1)),
+        (1, 1, True, (InputSnapshot(b"Hello"), 12, 2)),
+        (1, 0, True, (InputSnapshot(b" world"), 12, 2)),
+        (1, 0, False, (InputSnapshot(b"Hello"), 12, 2)),
+        (1, 1, False, (InputSnapshot(b" world"), 12, 2)),
+        (0, 0, True, (InputSnapshot(b""), 12, 1)),
+        (0, 0, False, (InputSnapshot(b""), 12, 1)),
     ],
 )
-def test_array_minimizer(granularity, segment, complement, result):
+def test_array_minimizer(granularity, segment, complement, expected):
     minim = BinaryMinimizer()
-    b = b"Hello world"
+    b = InputSnapshot(
+        stdin=b"Hello world"
+    )
     res = minim.minimize(b, granularity, segment, complement)
-    assert result == res
+    assert expected == res
 
 
 @pytest.mark.parametrize(
     "regex, expected, input",
-    [(r".*x.*y.*", "xy", "aaaxaaaaaayaaa"), (r".*aaa.*", "aaa", "aaaxaaaaaayaaa")],
+    [(r".*x.*y.*", InputSnapshot(b"xy"), InputSnapshot(b"aaaxaaaaaayaaa")), (r".*aaa.*", InputSnapshot(b"aaa"), InputSnapshot(b"aaaxaaaaaayaaa"))],
 )
 @pytest.mark.asyncio
 async def test_minimizer_loop(regex, expected, input):
