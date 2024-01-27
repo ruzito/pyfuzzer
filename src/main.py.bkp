@@ -1,0 +1,27 @@
+import argparse
+import signal
+import time
+
+
+def parse_arguments():
+    parser = argparse.ArgumentParser(description="Random Fuzzing Tool")
+    # Add arguments here
+    return parser.parse_args()
+
+
+# Function to handle Ctrl+C
+def signal_handler(sig, frame):
+    print("\nStopping...")
+    exit(0)
+
+
+# Register the signal handler
+signal.signal(signal.SIGINT, signal_handler)
+
+# Loop to run the subprocess
+while True:
+    print("Running subprocess...")
+    # Replace 'your_command' with the command you want to run
+    # subprocess.run(['your_command'])
+    # Optional: add a delay between runs
+    time.sleep(1)

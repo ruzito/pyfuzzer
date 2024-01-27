@@ -1,3 +1,4 @@
 #!/bin/bash
+
 export PYTHONPATH=`pwd`/src:`pwd`/tests
-mutmut run --runner="pytest tests/ --hypothesis-profile cover"
+./.poetry/bin/poetry run mutmut run --runner="pytest tests/ --hypothesis-profile cover" --paths-to-mutate=./src

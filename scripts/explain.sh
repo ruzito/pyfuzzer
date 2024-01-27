@@ -1,4 +1,4 @@
 #!/bin/bash
-export PYTHONPATH=`pwd`/src:`pwd`/tests
 
-pytest -v tests/ --hypothesis-profile explain
+export PYTHONPATH=`pwd`/src:`pwd`/tests
+./.poetry/bin/poetry run pytest -v tests/ --hypothesis-profile explain

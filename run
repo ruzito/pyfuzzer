@@ -4,7 +4,10 @@
 commands=(
     "coverage,./scripts/coverage.sh"
     "explain,./scripts/explain.sh"
+    "lint,./scripts/lint.sh"
     "mutations,./scripts/mutations.sh"
+    "poetry,./scripts/poetry.sh"
+    "property_test,./scripts/property_test.sh"
     "run,./scripts/run.sh"
     "setup,./scripts/setup.sh"
     "test,./scripts/test.sh"

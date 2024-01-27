@@ -1,0 +1,53 @@
+[tool.poetry]
+name = "pyfuzz"
+version = "0.1.0"
+description = "Your project description"
+authors = ["Your Name <you@example.com>"]
+license = "MIT"  # specify your license
+
+[tool.poetry.dependencies]
+python = "^3.10"  # specify the compatible Python versions
+psutil = "^5.9.8"
+
+[tool.poetry.dev-dependencies]
+black = "^23.12.1"
+pytest = "^7.4"
+pytest-asyncio = "^0.23"
+coverage = "^7.4"
+mutmut = "^2.4"
+hypothesis = "^6.93"
+pytest-timeout = "^2.2"
+mypy = "^1.8"
+flake8 = "^7.0"
+flake8-pyprojecttoml = "^0.0.2"
+
+# Configuration for mypy
+[tool.mypy]
+ignore_missing_imports = true
+# disallow_untyped_defs = true
+check_untyped_defs = true
+
+# Configuration for flake8
+[tool.flake8]
+max-line-length = 120
+ignore = [
+    "E203", # whitespace before :
+    "E302", # top level definition 2 empty lines
+    "E305", # top level definition after class 2 empty lines
+    "E117", # over-indented
+    "E126", # continuation line over-indented for hanging indent
+]
+exclude = ".venv,venv,.poetry,.git,__pycache__,docs,old,build,dist"
+
+# Configuration for pytest
+[tool.pytest.ini_options]
+addopts = "-ra -q"
+testpaths = [
+    "tests",
+    "integration_tests",
+]
+asyncio_mode = "auto"
+
+[build-system]
+requires = ["poetry>=1.0"]
+build-backend = "poetry.core.masonry.api"
