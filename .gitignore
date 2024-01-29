@@ -10,3 +10,4 @@ __pycache__
 /.poetry/
 /.mypy_cache/
 /.vscode
+/profile.svg

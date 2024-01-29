@@ -1,6 +1,6 @@
 import asyncio
-from runner import BashRunner
-import logging
+
+# import utils
 from abc import ABC, abstractmethod
 
 from functools import total_ordering
@@ -35,21 +35,11 @@ class AsyncJob(ABC):
 
 class JobQueueManager:
     def __init__(self, max_workers: int):
-        self.workers = []
+        self.workers: list[asyncio.Task[None]] = []
         self.sentinel = (99, None)
         self.max_workers = max_workers
         self.semaphore = asyncio.Semaphore(max_workers)
         self.jobs: asyncio.Queue = asyncio.PriorityQueue()
-
-    # async def enqueue_runner(
-    #     self, runner: Runner, input, args: dict, cb, cb_context=None
-    # ):
-    #     await self.jobs.put((1, (runner, input, args, cb, cb_context)))
-
-    # async def enqueue_minimize_runner(
-    #     self, runner: Runner, input, args: dict, cb, cb_context=None
-    # ):
-    #     await self.jobs.put((0, (runner, input, args, cb, cb_context)))
 
     async def push(self, job: AsyncJob, priority=5):
         await self.jobs.put((priority, job))
@@ -62,7 +52,7 @@ class JobQueueManager:
         self.workers = []
 
     async def worker(self, worker_id):
-        print("[{}]".format(worker_id), "Worker started")
+        # print("[{}]".format(worker_id), "Worker started")
         job = None
 
         def task_done():
@@ -70,28 +60,28 @@ class JobQueueManager:
             nonlocal self
             if job is not None:
                 self.jobs.task_done()
-                print("[{}]".format(worker_id), "job done")
+                # print("[{}]".format(worker_id), "job done")
             job = None
 
         while True:
             try:
-                print("[{}]".format(worker_id), "recieving job ...")
+                # print("[{}]".format(worker_id), "recieving job ...")
                 job = await self.jobs.get()
-                print("[{}]".format(worker_id), "recieved job:", job)
+                # print("[{}]".format(worker_id), "recieved job:", job)
                 if job == self.sentinel:
-                    print("[{}]".format(worker_id), "worker recieved sentinel")
+                    # print("[{}]".format(worker_id), "worker recieved sentinel")
                     break
                 (priority, j) = job
 
-                print("[{}]".format(worker_id), "worker witing for semaphore ...")
+                # print("[{}]".format(worker_id), "worker witing for semaphore ...")
                 async with self.semaphore:
-                    print("[{}]".format(worker_id), "worker entered semaphore")
-                    print("[{}]".format(worker_id), "worker awaiting runner ...")
+                    # print("[{}]".format(worker_id), "worker entered semaphore")
+                    # print("[{}]".format(worker_id), "worker awaiting runner ...")
                     await j.run()
-                    print("[{}]".format(worker_id), "worker awaited runner")
-            except Exception as e:
+                    # print("[{}]".format(worker_id), "worker awaited runner")
+            except BaseException as e:
                 # breakpoint()
-                print("[{}]".format(worker_id), "exception raised:", e)
+                # print("[{}]".format(worker_id), "exception raised:", e)
                 self.abort(exc=[worker_id])
                 raise e
             finally:
@@ -108,31 +98,42 @@ class JobQueueManager:
         self.workers = [
             asyncio.create_task(self.worker(i)) for i in range(self.max_workers)
         ]
+        # for w in self.workers:
+        #     utils.wrap_task(w)
 
     def empty(self):
         return self.jobs.empty()
+
+    def clear(self):
+        try:
+            while True:
+                self.jobs.get_nowait()
+        except asyncio.QueueEmpty:
+            pass
 
     def size(self):
         return self.jobs.qsize()
 
     async def join(self):
         for _ in range(self.max_workers):
-            print("putting sentinel ...")
+            # print("putting sentinel ...")
             await self.jobs.put(self.sentinel)
-            print("put sentinel")
-        print("joining queue ...")
+            # print("put sentinel")
+        # print("joining queue ...")
         results = await asyncio.gather(*self.workers, return_exceptions=True)
         for result in results:
-            if isinstance(result, Exception):
-                raise result
+            try:
+                if isinstance(result, Exception):
+                    raise result
+            except (BrokenPipeError, ConnectionResetError):
+                pass
 
         sz = self.size()
         if sz == 0:
             await self.jobs.join()
         else:
             raise Exception(
-                "Could not finish {} jobs correctly, this is certainly a bug in the jobqueue internal package. FIXME!".format(
-                    sz
-                )
+                "Could not finish {} jobs correctly, "
+                "this is certainly a bug in the jobqueue. FIXME!".format(sz)
             )
-        print("joined queue")
+        # print("joined queue")

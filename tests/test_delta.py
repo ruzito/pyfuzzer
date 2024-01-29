@@ -2,7 +2,8 @@ import pytest
 import re
 
 from minimizer import BinaryMinimizer, minimizer_loop, MinimizerRunner
-from snapshot import InputSnapshot
+from snapshot import InputSnapshot, OutputSnapshot
+
 
 class RegexOracle(MinimizerRunner):
     def __init__(self, regex):
@@ -11,7 +12,10 @@ class RegexOracle(MinimizerRunner):
     async def run(self, input):
         if len(input.stdin) <= 0:
             return False
-        return re.match(self.regex, input.stdin.decode('utf-8'))
+        return re.match(self.regex, input.stdin.decode("utf-8"))
+
+    def get_last_output(self) -> OutputSnapshot | None:
+        return None
 
 
 @pytest.mark.parametrize(
@@ -27,16 +31,17 @@ class RegexOracle(MinimizerRunner):
 )
 def test_array_minimizer(granularity, segment, complement, expected):
     minim = BinaryMinimizer()
-    b = InputSnapshot(
-        stdin=b"Hello world"
-    )
+    b = InputSnapshot(stdin=b"Hello world")
     res = minim.minimize(b, granularity, segment, complement)
     assert expected == res
 
 
 @pytest.mark.parametrize(
     "regex, expected, input",
-    [(r".*x.*y.*", InputSnapshot(b"xy"), InputSnapshot(b"aaaxaaaaaayaaa")), (r".*aaa.*", InputSnapshot(b"aaa"), InputSnapshot(b"aaaxaaaaaayaaa"))],
+    [
+        (r".*x.*y.*", InputSnapshot(b"xy"), InputSnapshot(b"aaaxaaaaaayaaa")),
+        (r".*aaa.*", InputSnapshot(b"aaa"), InputSnapshot(b"aaaxaaaaaayaaa")),
+    ],
 )
 @pytest.mark.asyncio
 async def test_minimizer_loop(regex, expected, input):
@@ -45,4 +50,4 @@ async def test_minimizer_loop(regex, expected, input):
     err_predicate = RegexOracle(regex)
 
     result = await minimizer_loop(input, err_predicate, minim)
-    assert expected == result
+    assert expected == result[0]

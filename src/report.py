@@ -78,7 +78,7 @@ def stop_generating():
 
 def update_minimization_queue_size(sz: int):
     global _report
-    _report["minimization_queue"] = sz
+    _report["minimization_queue"] += sz
 
 
 def update_failure_type_count(cnt: int):
@@ -93,7 +93,7 @@ def update_unique_minimized_hang_count(cnt: int):
     pass
 
 
-def add_run(hang: bool, fail: bool, exec_time: int):
+def add_run(hang: bool, fail: bool, exec_time: float):
     global _report
     _report["runs_total"] += 1
     if hang:

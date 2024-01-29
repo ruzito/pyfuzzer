@@ -1,14 +1,18 @@
 from copy import deepcopy
 
 from abc import ABC, abstractmethod
-from typing import Tuple
-from snapshot import InputSnapshot
+from snapshot import InputSnapshot, OutputSnapshot
+
 
 class MinimizerRunner(ABC):
     # Should return true if the minimizer should assume the run was a hit
     # Should return false otherwise
     @abstractmethod
     async def run(self, input: InputSnapshot) -> bool:
+        pass
+
+    @abstractmethod
+    def get_last_output(self) -> OutputSnapshot | None:
         pass
 
 
@@ -34,7 +38,7 @@ class Minimizer(ABC):
         granularity_level: int,
         segment_index: int,
         complement: bool,
-    ) -> Tuple[InputSnapshot, int, int]:
+    ) -> tuple[InputSnapshot, int, int]:
         pass
 
 
@@ -45,20 +49,21 @@ class BinaryMinimizer(Minimizer):
         granularity_level: int,
         segment_index: int,
         complement: bool,
-    ) -> Tuple[InputSnapshot, int, int]:
-        def create_snapshot(stdin:bytes)->InputSnapshot:
+    ) -> tuple[InputSnapshot, int, int]:
+        def create_snapshot(stdin: bytes) -> InputSnapshot:
             return InputSnapshot(
                 stdin=stdin,
                 args=input.args,
                 timeout=input.timeout,
                 env=input.env,
-                artifact_paths=input.artifact_paths
+                artifact_paths=input.artifact_paths,
             )
+
         payload = input.stdin
         length = len(payload)
         number_of_granularity_levels = length + 1
         if granularity_level == 0 and segment_index == 0:
-            return (create_snapshot(b''), number_of_granularity_levels, 1)
+            return (create_snapshot(b""), number_of_granularity_levels, 1)
 
         granularity = min(granularity_level, number_of_granularity_levels - 1)
         number_of_segments = granularity + 1
@@ -83,15 +88,21 @@ class BinaryMinimizer(Minimizer):
                 number_of_segments,
             )
         else:
-            res = (create_snapshot(segment_slice), number_of_granularity_levels, number_of_segments)
+            res = (
+                create_snapshot(segment_slice),
+                number_of_granularity_levels,
+                number_of_segments,
+            )
 
         return res
 
 
-async def minimizer_loop(input: InputSnapshot, runner: MinimizerRunner, minimizer: Minimizer):
+async def minimizer_loop(
+    input: InputSnapshot, runner: MinimizerRunner, minimizer: Minimizer
+) -> tuple[InputSnapshot, OutputSnapshot | None]:
     # copy base payload
     base_payload = deepcopy(input)
-
+    last_output = None
     # granularity_level, segment_index
     variant_iter_end = (1, 1)
     variant_iter = (0, 0)
@@ -116,10 +127,11 @@ async def minimizer_loop(input: InputSnapshot, runner: MinimizerRunner, minimize
         if hit and not same:
             # hit
             base_payload = x[0]
+            last_output = runner.get_last_output()
             variant_iter = (0, 0)
             variant_iter_end = (1, 1)
         else:
             # miss
             variant_iter = succ(variant_iter, variant_iter_end)
 
-    return base_payload
+    return base_payload, last_output

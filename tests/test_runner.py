@@ -28,13 +28,16 @@ async def test_runner_error():
     assert not timed_out
     assert exit_code == 2
     assert std_out == b""
-    assert std_err == dedent(
-        """
+    assert (
+        std_err
+        == dedent(
+            """
         grep: invalid option -- 'g'
         Usage: grep [OPTION]... PATTERNS [FILE]...
         Try 'grep --help' for more information.
         """
-    ).encode('utf-8')
+        ).encode("utf-8")
+    )
 
 
 @pytest.mark.asyncio
@@ -68,7 +71,7 @@ class TestRepeatedExecution:
         (exit_code, std_out, std_err, timed_out) = await cat_runner.run(text, {})
         assert not timed_out
         assert exit_code == 0
-        assert std_out == text.encode('utf-8')
+        assert std_out == text.encode("utf-8")
         assert std_err == b""
 
     @pytest.mark.asyncio
@@ -77,7 +80,7 @@ class TestRepeatedExecution:
         (exit_code, std_out, std_err, timed_out) = await cat_runner.run(text, {})
         assert not timed_out
         assert exit_code == 0
-        assert std_out == text.encode('utf-8')
+        assert std_out == text
         assert std_err == b""
 
 

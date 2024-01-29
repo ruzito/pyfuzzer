@@ -8,6 +8,7 @@ license = "MIT"  # specify your license
 [tool.poetry.dependencies]
 python = "^3.10"  # specify the compatible Python versions
 psutil = "^5.9.8"
+py-spy = "^0.3.14"
 
 [tool.poetry.dev-dependencies]
 black = "^23.12.1"
@@ -36,6 +37,7 @@ ignore = [
     "E305", # top level definition after class 2 empty lines
     "E117", # over-indented
     "E126", # continuation line over-indented for hanging indent
+    "W503", # line break before binary operator
 ]
 exclude = ".venv,venv,.poetry,.git,__pycache__,docs,old,build,dist"
 

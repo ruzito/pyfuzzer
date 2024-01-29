@@ -4,11 +4,10 @@ from abc import ABC, abstractmethod
 
 from snapshot import OutputSnapshot
 
+
 class Oracle(ABC):
     @abstractmethod
-    def categorize(
-        self, output: OutputSnapshot
-    ) -> bytes:
+    async def categorize(self, output: OutputSnapshot) -> bytes:
         pass
 
 

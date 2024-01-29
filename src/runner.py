@@ -1,17 +1,20 @@
 import asyncio
-import psutil
 import os
 import signal
-from typing import List, Mapping
 from snapshot import InputSnapshot, OutputSnapshot
+import time
+
+# import utils
 
 
-async def _gather_artifacts(paths: Mapping[str, bytes])->Mapping[str,bytes]:
+async def _gather_artifacts(paths: dict[str, bytes]) -> dict[str, bytes]:
     # TODO: gather artifacts
     return {}
 
+
 async def runexec(input: InputSnapshot) -> OutputSnapshot:
     # Run the subprocess with input
+    start_time = time.perf_counter()
     process = await asyncio.create_subprocess_exec(
         *input.args,
         stdin=asyncio.subprocess.PIPE,
@@ -20,12 +23,16 @@ async def runexec(input: InputSnapshot) -> OutputSnapshot:
         start_new_session=True
     )
 
+    # print(*input.args)
+    # print (process.returncode)
     try:
         if process.stdin is not None:
             process.stdin.write(input.stdin)
             await process.stdin.drain()
             process.stdin.close()
-    except Exception as e:
+    except (BrokenPipeError, ConnectionResetError):
+        pass
+    except BaseException:
         import traceback
 
         print(
@@ -48,10 +55,12 @@ async def runexec(input: InputSnapshot) -> OutputSnapshot:
     # that I want to be able to get stdout and stderr (at least partialy)
     # even if the cmd times out
     # And be able to have this as an async job that I can stuff into thread pool
-    stdout_chunks: List[bytes] = []
-    stderr_chunks: List[bytes] = []
+    stdout_chunks: list[bytes] = []
+    stderr_chunks: list[bytes] = []
     stdout_task = asyncio.create_task(read_stream(process.stdout, stdout_chunks))
     stderr_task = asyncio.create_task(read_stream(process.stderr, stderr_chunks))
+    # utils.wrap_task(stdout_task)
+    # utils.wrap_task(stderr_task)
 
     flags = {"cb_run": False, "timed_out": False}
 
@@ -76,11 +85,11 @@ async def runexec(input: InputSnapshot) -> OutputSnapshot:
     if flags["timed_out"]:
         # assert False
         # process.kill()
-        if process.returncode == None:
-            print("PID:", process.pid)
-            print("PGID:", os.getpgid(process.pid))
+        if process.returncode is None:
+            # print("PID:", process.pid)
+            # print("PGID:", os.getpgid(process.pid))
             # breakpoint()
-            print("breakpoint")
+            # print("breakpoint")
             try:
                 os.killpg(os.getpgid(process.pid), signal.SIGTERM)
             except ProcessLookupError:
@@ -90,6 +99,8 @@ async def runexec(input: InputSnapshot) -> OutputSnapshot:
             # assert False
 
     await process.wait()
+    end_time = time.perf_counter_ns()
+    perf_time = end_time - start_time
 
     # fuck GCs, I want my destructors back
     # this .close() is being run by _transport.__del__() as well,
@@ -106,12 +117,13 @@ async def runexec(input: InputSnapshot) -> OutputSnapshot:
         stderr=stderr,
         exit_code=process.returncode,
         timed_out=flags["timed_out"],
-        artifacts=await _gather_artifacts(input.artifact_paths)
+        time=perf_time,
+        artifacts=await _gather_artifacts(input.artifact_paths),
     )
 
 
 class BashRunner:
-    def __init__(self, cmd, *, timeout:int|float=5000):
+    def __init__(self, cmd, *, timeout: int | float = 5000):
         self.cmd = cmd
         self.timeout = timeout
 
@@ -121,14 +133,16 @@ class BashRunner:
         elif isinstance(input, bytes):
             byte_input = input
         else:
-            raise TypeError('Input must be a `str` or `bytes`')
-        
+            raise TypeError("Input must be a `str` or `bytes`")
+
         command = ["bash", "-c", self.cmd.format(**args)]
 
-        out:OutputSnapshot = await runexec(InputSnapshot(
-            stdin=byte_input,
-            args=command,
-            timeout=self.timeout,
-        ))
+        out: OutputSnapshot = await runexec(
+            InputSnapshot(
+                stdin=byte_input,
+                args=command,
+                timeout=self.timeout,
+            )
+        )
 
         return (out.exit_code, out.stdout, out.stderr, out.timed_out)

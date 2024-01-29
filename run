@@ -7,6 +7,7 @@ commands=(
     "lints,./scripts/lint.sh"
     "mutations,./scripts/mutations.sh"
     "poetry,./scripts/poetry.sh"
+    "profile,./scripts/profile.sh"
     "property_tests,./scripts/property_test.sh"
     "run,./scripts/run.sh"
     "setup,./scripts/setup.sh"
