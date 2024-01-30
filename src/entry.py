@@ -1,7 +1,7 @@
 from asyncio import sleep
 from minimizer import BinaryMinimizer, MinimizerRunner, Minimizer, minimizer_loop
 from jobqueue import JobQueueManager, AsyncJob
-from randomizer import ByteRandomizer, Randomizer
+from randomizer import ByteRandomizer, Randomizer, HellRandomizer
 from runner import runexec
 from utils import bash
 from oracle import Oracle
@@ -23,14 +23,14 @@ class ApplicationContext:
 
 async def attempt_run(
     input: InputSnapshot, context: ApplicationContext
-) -> tuple[bytes, OutputSnapshot]:
+) -> tuple[bytes | None, OutputSnapshot]:
     result: OutputSnapshot = await runexec(input)
-    hsh: bytes = await context.oracle.categorize(result)
+    hsh: bytes | None = await context.oracle.categorize(result)
+    add_run(result.timed_out, hsh is not None, result.time)
     if hsh is not None and hsh not in context.unique_errors:
         context.unique_errors[hsh] = RunSnapshot(input, result)
         update_minimization_queue_size(1)
         await context.job_queue.push(MinimizeInputJob(input, context, hsh))
-    add_run(result.timed_out, hsh is not None, result.time)
     return (hsh, result)
 
 
@@ -41,8 +41,9 @@ class OracleMinimizerRunner(MinimizerRunner):
         self.last_output: None | OutputSnapshot = None
 
     async def run(self, input: InputSnapshot) -> bool:
+        await sleep(5)
         (hsh, out) = await attempt_run(input, self.context)
-        hit: bool = self.hash == hsh
+        hit: bool = hsh is not None and self.hash == hsh
         self.last_output = out
         return hit
 
@@ -87,16 +88,18 @@ class RandomInputJob(AsyncJob):
 
 
 class MyOracle(Oracle):
-    async def categorize(self, output: OutputSnapshot) -> bytes:
-        return b""
+    async def categorize(self, output: OutputSnapshot) -> bytes | None:
+        if b"hell" in output.stdout:
+            return b"hell"
+        return None
 
 
 class Application:
     def __init__(self):
-        self.workers = 5
+        self.workers = 10
         self.defer_exit_flag = True
         self.initial_input = InputSnapshot(
-            stdin=b"", args=bash("sleep 1"), timeout=5000
+            stdin=b"", args=bash("cat | tee wut2.log"), timeout=5000
         )
         self.context = ApplicationContext(
             job_queue=JobQueueManager(max_workers=self.workers),
@@ -104,7 +107,8 @@ class Application:
             oracle=MyOracle(),
             unique_errors={},
             unique_errors_minimized={},
-            randomizer=ByteRandomizer(self.initial_input),
+            # randomizer=ByteRandomizer(self.initial_input),
+            randomizer=HellRandomizer(self.initial_input),
         )
         self.context.job_queue.start()
 
@@ -117,7 +121,7 @@ class Application:
         await self.context.job_queue.push(RandomInputJob(input, self.context))
 
     async def minimize_stage(self):
-        if self.context.job_queue.empty():
+        if self.context.job_queue.done():
             await self.context.job_queue.join()
             self.defer_exit_flag = False
         else:
@@ -159,8 +163,8 @@ async def loop(stage):
     elif stage == 1:
         await _app.minimize_stage()
     elif stage == 2:
-        await _app.soft_stop()
-    else:
+        # await _app.soft_stop()
+        # else:
         await _app.hard_stop()
         return False
 

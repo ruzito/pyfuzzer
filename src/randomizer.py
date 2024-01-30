@@ -11,6 +11,32 @@ class Randomizer(ABC):
         pass
 
 
+class HellRandomizer(Randomizer):
+    def __init__(self, input):
+        self.cnt = 0
+        self.template = input
+
+    def get_input(self) -> InputSnapshot:
+        if self.cnt == 0:
+            self.cnt += 1
+            return InputSnapshot(
+                stdin=b"qwertyuhellertyui",
+                args=self.template.args,
+                timeout=self.template.timeout,
+                env=self.template.env,
+                artifact_paths=self.template.artifact_paths,
+            )
+
+        self.cnt += 1
+        return InputSnapshot(
+            stdin=b"heaven",
+            args=self.template.args,
+            timeout=self.template.timeout,
+            env=self.template.env,
+            artifact_paths=self.template.artifact_paths,
+        )
+
+
 class ByteRandomizer(Randomizer):
     def __init__(self, input: InputSnapshot) -> None:
         self.min_size = 0

@@ -24,7 +24,7 @@ class AsyncJob(ABC):
     # @returns (minimized_payload, number_of_granularity_levels)
     @abstractmethod
     async def run(self):
-        pass
+        pass  # pragma: no cover
 
     def __eq__(self, other):
         return id(self) == id(other)
@@ -35,6 +35,7 @@ class AsyncJob(ABC):
 
 class JobQueueManager:
     def __init__(self, max_workers: int):
+        self.sentinels_at_place = False
         self.workers: list[asyncio.Task[None]] = []
         self.sentinel = (99, None)
         self.max_workers = max_workers
@@ -111,14 +112,25 @@ class JobQueueManager:
         except asyncio.QueueEmpty:
             pass
 
+    async def ensure_sentinels(self):
+        if self.sentinels_at_place:
+            return
+        for _ in range(self.max_workers):
+            await self.jobs.put(self.sentinel)
+        self.sentinels_at_place = True
+
+    async def clear_and_quit(self):
+        self.clear()
+        await self.ensure_sentinels()
+
     def size(self):
         return self.jobs.qsize()
 
+    def done(self):
+        return self.jobs.qsize() and self.sentinels_at_place
+
     async def join(self):
-        for _ in range(self.max_workers):
-            # print("putting sentinel ...")
-            await self.jobs.put(self.sentinel)
-            # print("put sentinel")
+        await self.ensure_sentinels()
         # print("joining queue ...")
         results = await asyncio.gather(*self.workers, return_exceptions=True)
         for result in results:
@@ -132,7 +144,7 @@ class JobQueueManager:
         if sz == 0:
             await self.jobs.join()
         else:
-            raise Exception(
+            raise Exception(  # pragma: no cover
                 "Could not finish {} jobs correctly, "
                 "this is certainly a bug in the jobqueue. FIXME!".format(sz)
             )

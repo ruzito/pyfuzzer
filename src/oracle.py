@@ -7,7 +7,7 @@ from snapshot import OutputSnapshot
 
 class Oracle(ABC):
     @abstractmethod
-    async def categorize(self, output: OutputSnapshot) -> bytes:
+    async def categorize(self, output: OutputSnapshot) -> bytes | None:
         pass
 
 

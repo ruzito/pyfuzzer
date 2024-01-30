@@ -4,9 +4,11 @@ import signal
 import sys
 import cProfile
 import pstats
+import config
 
 from entry import loop
 from report import render, final_report, stop_generating
+from seppuku import seppuku
 
 # import utils
 
@@ -24,6 +26,8 @@ def sigint_handler(signum, frame):
     global _signal_recieved
     _signal_recieved += 1
     stop_generating()
+    if _signal_recieved > 5:
+        seppuku()
 
 
 def curses_init():
@@ -78,8 +82,6 @@ async def async_main():
     # utils.wrap_task(app_task)
     print("await gather", file=sys.stderr)
     _ = await asyncio.gather(render_task, app_task, return_exceptions=True)
-    # for result in results:
-    # pass
     print("curses_finalize", file=sys.stderr)
     curses_finalize()
     print("should be visible")
@@ -98,6 +100,8 @@ async def profile():
 
 def main():
     import traceback
+
+    config.init()
 
     try:
         signal.signal(signal.SIGINT, sigint_handler)

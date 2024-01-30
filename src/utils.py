@@ -2,7 +2,7 @@ import sys
 
 
 def bash(cmd: str):
-    return [b"bash", b"-c", str.encode("utf-8")]
+    return [b"bash", b"-c", cmd.encode("utf-8")]
 
 
 def handle_task_exception(task):

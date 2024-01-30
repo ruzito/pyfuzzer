@@ -1,8 +1,10 @@
 import asyncio
 import os
 import signal
+import sys
 from snapshot import InputSnapshot, OutputSnapshot
 import time
+import seppuku
 
 # import utils
 
@@ -15,6 +17,7 @@ async def _gather_artifacts(paths: dict[str, bytes]) -> dict[str, bytes]:
 async def runexec(input: InputSnapshot) -> OutputSnapshot:
     # Run the subprocess with input
     start_time = time.perf_counter()
+    # try:
     process = await asyncio.create_subprocess_exec(
         *input.args,
         stdin=asyncio.subprocess.PIPE,
@@ -22,25 +25,28 @@ async def runexec(input: InputSnapshot) -> OutputSnapshot:
         stderr=asyncio.subprocess.PIPE,
         start_new_session=True
     )
+    seppuku.register_process(process)
+    # except BaseException:
+    #     print(input, file=sys.stderr)
+    #     raise
 
-    # print(*input.args)
-    # print (process.returncode)
     try:
         if process.stdin is not None:
             process.stdin.write(input.stdin)
             await process.stdin.drain()
             process.stdin.close()
-    except (BrokenPipeError, ConnectionResetError):
+    # No cover - flaky
+    except (BrokenPipeError, ConnectionResetError):  # pragma: no cover
         pass
-    except BaseException:
-        import traceback
+    # except BaseException:
+    #     import traceback
 
-        print(
-            "Runner caught exception during attempt to write to stdin:\n{}".format(
-                traceback.format_exc()
-            )
-        )
-        pass
+    #     print(
+    #         "Runner caught exception during attempt to write to stdin:\n{}".format(
+    #             traceback.format_exc()
+    #         )
+    #     )
+    #     pass
 
     async def read_stream(stream, chunks, chunk_sizes=1024):
         while True:
@@ -49,7 +55,7 @@ async def runexec(input: InputSnapshot) -> OutputSnapshot:
                 break
             chunks.append(chunk)
             if stream.at_eof():
-                return
+                return  # pragma: no cover
 
     # The following shannanigans are here to cope with the fact
     # that I want to be able to get stdout and stderr (at least partialy)
@@ -67,7 +73,8 @@ async def runexec(input: InputSnapshot) -> OutputSnapshot:
     def timeout_callback():
         flags["cb_run"] = True
         if stdout_task.done() and stderr_task.done():
-            return
+            # No cover - flaky
+            return  # pragma: no cover
         flags["timed_out"] = True
         stdout_task.cancel()
         stderr_task.cancel()
@@ -92,15 +99,19 @@ async def runexec(input: InputSnapshot) -> OutputSnapshot:
             # print("breakpoint")
             try:
                 os.killpg(os.getpgid(process.pid), signal.SIGTERM)
-            except ProcessLookupError:
+            # No cover - flaky
+            except ProcessLookupError:  # pragma: no cover
                 pass
             # breakpoint()
             # os.killpg(process.pid, signal.SIGTERM)
             # assert False
 
     await process.wait()
+    seppuku.release_process(process)
     end_time = time.perf_counter_ns()
     perf_time = end_time - start_time
+    print(*input.args, file=sys.stderr)
+    print(process.returncode, file=sys.stderr)
 
     # fuck GCs, I want my destructors back
     # this .close() is being run by _transport.__del__() as well,
