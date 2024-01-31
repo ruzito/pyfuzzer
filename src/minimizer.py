@@ -1,19 +1,7 @@
 from copy import deepcopy
-
+from oracle import Runner
 from abc import ABC, abstractmethod
 from snapshot import InputSnapshot, OutputSnapshot
-
-
-class MinimizerRunner(ABC):
-    # Should return true if the minimizer should assume the run was a hit
-    # Should return false otherwise
-    @abstractmethod
-    async def run(self, input: InputSnapshot) -> bool:
-        pass  # pragma: no cover
-
-    @abstractmethod
-    def get_last_output(self) -> OutputSnapshot | None:
-        pass  # pragma: no cover
 
 
 class Minimizer(ABC):
@@ -98,7 +86,7 @@ class BinaryMinimizer(Minimizer):
 
 
 async def minimizer_loop(
-    input: InputSnapshot, runner: MinimizerRunner, minimizer: Minimizer
+    input: InputSnapshot, runner: Runner, minimizer: Minimizer
 ) -> tuple[InputSnapshot, OutputSnapshot | None]:
     # copy base payload
     base_payload = deepcopy(input)

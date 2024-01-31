@@ -1,24 +1,60 @@
 from asyncio import sleep
-from minimizer import BinaryMinimizer, MinimizerRunner, Minimizer, minimizer_loop
+import asyncio
+from minimizer import BinaryMinimizer, Runner, Minimizer, minimizer_loop
 from jobqueue import JobQueueManager, AsyncJob
-from randomizer import ByteRandomizer, Randomizer, HellRandomizer
+from randomizer import CStrRandomizer, ByteRandomizer, Randomizer, HellRandomizer
 from runner import runexec
 from utils import bash
 from oracle import Oracle
 from snapshot import InputSnapshot, OutputSnapshot, RunSnapshot
 from dataclasses import dataclass
 from report import update_minimization_queue_size, add_run
+import config
 
 
 @dataclass
 class ApplicationContext:
     job_queue: JobQueueManager
-    minimizer: Minimizer
+    minimizer: Minimizer | None
     oracle: Oracle
     unique_errors: dict[bytes, RunSnapshot]
     unique_errors_minimized: dict[bytes, RunSnapshot]
     randomizer: Randomizer
     minimization_queue_size: int = 0
+
+
+def options_to_context(opts: config.Options) -> ApplicationContext:
+    cmd_str = opts.command
+    cmd = bash(cmd_str)
+    template_input = InputSnapshot(
+        stdin=b"", args=cmd, timeout=opts.timeout
+    )
+    rnd: Randomizer
+    minm: Minimizer | None
+    orcl: Oracle = MyOracle()
+    if opts.generator == config.InputType.HELL_MOCK:
+        rnd = HellRandomizer(template_input)
+        minm = BinaryMinimizer()
+    elif opts.generator == config.InputType.BYTES:
+        rnd = ByteRandomizer(template_input)
+        minm = BinaryMinimizer()
+    elif opts.generator == config.InputType.CSTR:
+        rnd = CStrRandomizer(template_input)
+        minm = BinaryMinimizer()
+    else:
+        raise NotImplementedError
+
+    if not opts.minimize:
+        minm = None
+
+    return ApplicationContext(
+        job_queue=JobQueueManager(max_workers=opts.workers),
+        minimizer=minm,
+        oracle=orcl,
+        unique_errors={},
+        unique_errors_minimized={},
+        randomizer=rnd,
+    )
 
 
 async def attempt_run(
@@ -34,7 +70,7 @@ async def attempt_run(
     return (hsh, result)
 
 
-class OracleMinimizerRunner(MinimizerRunner):
+class OracleRunner(Runner):
     def __init__(self, context: ApplicationContext, hsh: bytes):
         self.context = context
         self.hash = hsh
@@ -58,9 +94,13 @@ class MinimizeInputJob(AsyncJob):
         self.hash = hsh
 
     async def run(self):
+        if self.context.minimizer is None:
+            update_minimization_queue_size(-1)
+            return
+
         result_input, result_output = await minimizer_loop(
             self.input,
-            OracleMinimizerRunner(self.context, self.hash),
+            OracleRunner(self.context, self.hash),
             self.context.minimizer,
         )
         if result_output is None:
@@ -96,20 +136,10 @@ class MyOracle(Oracle):
 
 class Application:
     def __init__(self):
-        self.workers = 10
         self.defer_exit_flag = True
-        self.initial_input = InputSnapshot(
-            stdin=b"", args=bash("cat | tee wut2.log"), timeout=5000
-        )
-        self.context = ApplicationContext(
-            job_queue=JobQueueManager(max_workers=self.workers),
-            minimizer=BinaryMinimizer(),
-            oracle=MyOracle(),
-            unique_errors={},
-            unique_errors_minimized={},
-            # randomizer=ByteRandomizer(self.initial_input),
-            randomizer=HellRandomizer(self.initial_input),
-        )
+        opts = config.get()
+        self.context = options_to_context(opts)
+        self.workers = opts.workers
         self.context.job_queue.start()
 
     async def generate_stage(self):
@@ -121,6 +151,7 @@ class Application:
         await self.context.job_queue.push(RandomInputJob(input, self.context))
 
     async def minimize_stage(self):
+        await self.context.job_queue.ensure_sentinels()
         if self.context.job_queue.done():
             await self.context.job_queue.join()
             self.defer_exit_flag = False
@@ -129,12 +160,12 @@ class Application:
 
     async def soft_stop(self):
         if not self.context.job_queue.empty():
-            self.context.job_queue.clear()
+            await self.context.job_queue.clear_and_quit()
 
     async def hard_stop(self):
         self.context.job_queue.abort()
         if not self.context.job_queue.empty():
-            self.context.job_queue.clear()
+            await self.context.job_queue.clear_and_quit()
         self.defer_exit_flag = False
 
     def defer_exit(self) -> bool:
@@ -146,9 +177,6 @@ _app = None
 
 async def loop(stage):
     """
-    stage == 0 means we should generate random input
-    stage == 1 means we should only minimize
-
     @param stage
     @returns False when the app is ready to be stopped
 

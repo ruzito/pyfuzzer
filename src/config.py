@@ -1,9 +1,7 @@
 import argparse
+from dataclasses import dataclass
 from typing import Sequence
 from enum import Enum
-
-_options = None
-_command = None
 
 
 class InputMethod(Enum):
@@ -11,51 +9,96 @@ class InputMethod(Enum):
     FILE = 2
 
 
-def parse(args: Sequence[str] | None = None) -> tuple[argparse.Namespace, list[str]]:
-    parser = argparse.ArgumentParser(description="Random Fuzzing Tool")
-    group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument(
-        "--stdin",
-        action="store_const",
-        dest="input_method",
-        const=InputMethod.STDIN,
-        help="Fuzz through stdin",
-    )
-    group.add_argument(
-        "--file",
-        action="store_const",
-        dest="input_method",
-        const=InputMethod.FILE,
-        help="Fuzz through file",
-    )
-    parser.add_argument(
-        "--generator",
-        required=True,
-        nargs=1,
-        type=str,
-        help="Which random generator to use",
-    )
+class InputType(Enum):
+    BYTES = 1
+    CSTR = 2
+    HELL_MOCK = 666
+
+
+@dataclass
+class Options:
+    input_method: InputMethod
+    minimize: bool
+    generator: InputType
+    results: str
+    timeout: int
+    workers: int
+    command: str
+
+
+_options: Options | None = None
+
+
+class Args(argparse.ArgumentParser):
+    def add_enum(self, opt: str, enum: type[Enum], **kwargs):
+        def tp(s: str):
+            return s.lower()
+
+        class EnumAction(argparse.Action):
+            def __call__(self, parser, namespace, value, option_string=None):
+                # Set the enum instance to the namespace
+                enum_val = None
+                for k, _ in enum.__members__.items():
+                    if k.lower() == value.lower():
+                        enum_val = enum[k]
+                setattr(namespace, self.dest, enum_val)
+
+        self.add_argument(
+            opt,
+            type=tp,
+            action=EnumAction,
+            choices=[e.name.lower() for e in enum],
+            **kwargs
+        )
+
+
+def parse(args: Sequence[str] | None = None) -> Options:
+    parser = Args(description="Random Fuzzing Tool")
+    parser.add_enum("--generator", InputType, required=True)
+    parser.add_enum("--input-method", InputMethod, required=True)
     parser.add_argument(
         "--results", required=True, nargs=1, type=str, help="Where to store results"
     )
     parser.add_argument(
         "--timeout",
         required=True,
-        nargs=1,
+        # nargs=1,
         type=int,
         help="Timeout after which assume the program has hanged",
     )
     parser.add_argument(
-        "--minimizer",
-        nargs=1,
+        "--workers",
+        required=True,
+        # nargs=1,
+        type=int,
+        help="How many parallel instances of the fuzzed program to run at most",
+    )
+    parser.add_argument(
+        "--minimize",
+        action="store_true",
+        help="Determines wether failures should be minimized, "
+        "this can cause a significant performance hit",
+        default=False,
+    )
+    parser.add_argument(
+        "command",
         type=str,
-        help="Which minimizer to use, if one should be used",
+        # nargs=1,
+        help="command to test, add environment variable $PYFUZZ_FILE "
+        "if you use the `file` input mehod",
     )
 
-    return parser.parse_known_args(args)
+    opts = parser.parse_args(args)
+    return Options(**vars(opts))
 
 
 def init():
     global _options
-    global _command
-    _options, _command = parse()  # pragma: no cover
+    _options = parse()
+
+
+def get() -> Options:
+    global _options
+    if _options is None:
+        init()
+    return _options  # type: ignore

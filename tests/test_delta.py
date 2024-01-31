@@ -1,11 +1,11 @@
 import pytest
 import re
 
-from minimizer import BinaryMinimizer, minimizer_loop, MinimizerRunner
+from minimizer import BinaryMinimizer, minimizer_loop, Runner
 from snapshot import InputSnapshot, OutputSnapshot
 
 
-class RegexOracle(MinimizerRunner):
+class RegexOracle(Runner):
     def __init__(self, regex):
         self.regex = regex
 

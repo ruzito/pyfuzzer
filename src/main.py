@@ -80,11 +80,11 @@ async def async_main():
     # utils.wrap_task(render_task)
     app_task = loop.create_task(app_loop())
     # utils.wrap_task(app_task)
-    print("await gather", file=sys.stderr)
+    # print("await gather", file=sys.stderr)
     _ = await asyncio.gather(render_task, app_task, return_exceptions=True)
-    print("curses_finalize", file=sys.stderr)
+    # print("curses_finalize", file=sys.stderr)
     curses_finalize()
-    print("should be visible")
+    # print("should be visible")
     final_report()
 
 

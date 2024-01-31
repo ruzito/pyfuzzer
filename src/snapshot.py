@@ -14,7 +14,7 @@ class OutputSnapshot:
 @dataclass
 class InputSnapshot:
     stdin: bytes
-    args: list[bytes] = field(default_factory=list)
+    args: list[bytes]
     timeout: int | float = 5000
     env: dict[bytes, bytes | None] = field(default_factory=dict)
     artifact_paths: dict[str, bytes] = field(default_factory=dict)

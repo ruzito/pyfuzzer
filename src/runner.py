@@ -6,6 +6,7 @@ from snapshot import InputSnapshot, OutputSnapshot
 import time
 import seppuku
 
+
 # import utils
 
 
@@ -110,8 +111,8 @@ async def runexec(input: InputSnapshot) -> OutputSnapshot:
     seppuku.release_process(process)
     end_time = time.perf_counter_ns()
     perf_time = end_time - start_time
-    print(*input.args, file=sys.stderr)
-    print(process.returncode, file=sys.stderr)
+    # print(*input.args, file=sys.stderr)
+    # print(process.returncode, file=sys.stderr)
 
     # fuck GCs, I want my destructors back
     # this .close() is being run by _transport.__del__() as well,
